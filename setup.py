@@ -16,12 +16,29 @@
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 # written by: Jeff Ortel ( jortel@redhat.com )
 
+import pkg_resources
+from setuptools import setup, find_packages
+
 import os
 import os.path
 import sys
 
-import pkg_resources
-from setuptools import setup, find_packages
+
+def read_python_code(filename):
+    "Returns the given Python source file's compiled content."
+    file = open(filename, "rt")
+    try:
+        source = file.read()
+    finally:
+        file.close()
+    #   Python 2.6 and below did not support passing strings to exec() &
+    # compile() functions containing line separators other than '\n'. To
+    # support them we need to manually make sure such line endings get
+    # converted even on platforms where this is not handled by native text file
+    # read operations.
+    source = source.replace("\r\n", "\n").replace("\r", "\n")
+    return compile(source, filename, "exec")
+
 
 # Setup documentation incorrectly states that it will search for packages
 # relative to the setup script folder by default when in fact it will search
@@ -36,8 +53,8 @@ from setuptools import setup, find_packages
 #     parameters makes the final installed distribution contain the absolute
 #     package source location information and not include some other meta-data
 #     package information as well.
-script_folder = os.path.abspath(os.path.dirname(__file__))
-current_folder = os.path.abspath(os.getcwd())
+script_folder = os.path.realpath(os.path.dirname(__file__))
+current_folder = os.path.realpath(os.getcwd())
 if script_folder != current_folder:
     print("ERROR: Suds library setup script needs to be run from the folder "
         "containing it.")
@@ -56,11 +73,20 @@ if script_folder != current_folder:
 #     forcing the user to install them manually (since the setup procedure that
 #     is supposed to install them automatically will not be able to run unless
 #     they are already installed).
-execfile(os.path.join("suds", "version.py"))
+#   We execute explicitly compiled source code instead of having the exec()
+# function compile it to get a better error messages. If we used exec() on the
+# source code directly, the source file would have been listed as just
+# '<string>'.
+exec(read_python_code(os.path.join("suds", "version.py")))
 
-extra = {}
-if sys.version_info >= (3,0):
-    extra["use_2to3"] = True
+extra_setup_params = {}
+
+if sys.version_info >= (2, 5):
+    # distutils.setup() 'obsoletes' parameter not introduced until Python 2.5.
+    extra_setup_params["obsoletes"] = ["suds"]
+
+if sys.version_info >= (3, 0):
+    extra_setup_params["use_2to3"] = True
 
     #   Teach Python's urllib lib2to3 fixer that the old urllib2.__version__
     # data member is now stored in the urllib.request module.
@@ -92,9 +118,9 @@ again.
 
 package_name = "suds-philpem"
 version_tag = pkg_resources.safe_version(__version__)
-project_url = "https://bitbucket.org/philpem/suds"
-base_download_url = project_url + "/downloads"
-download_distribution_name = "%s-%s.tar.bz2" % (package_name, version_tag)
+project_url = "https://github.com/EnetModa/suds-philpem"
+base_download_url = project_url + "/releases"
+download_distribution_name = "%s-%s.zip" % (package_name, version_tag)
 download_url = "%s/%s" % (base_download_url, download_distribution_name)
 packages_excluded_from_build = []
 
@@ -113,9 +139,6 @@ setup(
     keywords=["SOAP", "web", "service", "client"],
     url=project_url,
     download_url=download_url,
-    obsoletes=["suds"],
-    setup_requires=["distribute"],
-    tests_require=["pytest"],
     packages=find_packages(exclude=packages_excluded_from_build),
 
     # 'maintainer' will be listed as the distribution package author.
@@ -129,8 +152,8 @@ setup(
     # any other.
     author="Jeff Ortel",
     author_email="jortel@redhat.com",
-    maintainer="Philip Pemberton",
-    maintainer_email="philpem@gmail.com",
+    maintainer="EnetModa",
+    maintainer_email="nexus@enet-tr.com",
 
     #   See PEP-301 for the classifier specification. For a complete list of
     # available classifiers see
@@ -153,10 +176,10 @@ setup(
         "Programming Language :: Python :: 3.2",
         "Topic :: Internet"],
 
-    #   PEP-314 states that if possible license & plaform should be specified
+    #   PEP-314 states that if possible license & platform should be specified
     # using 'classifiers'.
     license="(specified using classifiers)",
     platforms=["(specified using classifiers)"],
 
-    **extra
+    **extra_setup_params
 )
